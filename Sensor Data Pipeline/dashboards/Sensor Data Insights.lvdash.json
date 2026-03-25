@@ -1,0 +1,1650 @@
+{
+  "datasets": [
+    {
+      "name": "c6ef7979",
+      "displayName": "Hourly sensor trends",
+      "queryLines": [
+        "-- Powers the line chart showing sensor values over time\r\n",
+        "SELECT\r\n",
+        "    hour_window,\r\n",
+        "    machine_id,\r\n",
+        "    sensor_type,\r\n",
+        "    avg_value,\r\n",
+        "    min_value,\r\n",
+        "    max_value,\r\n",
+        "    reading_count\r\n",
+        "FROM iot_pipeline.sensors_dlt.gold_hourly_stats\r\n",
+        "ORDER BY hour_window, machine_id, sensor_type"
+      ],
+      "catalog": "iot_pipeline",
+      "schema": "sensors_dlt"
+    },
+    {
+      "name": "72e4b266",
+      "displayName": "Daily reading counts",
+      "queryLines": [
+        "-- Powers the bar chart showing activity per machine per day\r\n",
+        "SELECT\r\n",
+        "    TO_DATE(hour_window)     AS date,\r\n",
+        "    machine_id,\r\n",
+        "    SUM(reading_count)       AS total_readings,\r\n",
+        "    ROUND(AVG(avg_value), 4) AS overall_avg\r\n",
+        "FROM iot_pipeline.sensors_dlt.gold_hourly_stats\r\n",
+        "GROUP BY TO_DATE(hour_window), machine_id\r\n",
+        "ORDER BY date, machine_id"
+      ],
+      "catalog": "iot_pipeline",
+      "schema": "sensors_dlt"
+    },
+    {
+      "name": "b59d15e4",
+      "displayName": "Daily health scores",
+      "queryLines": [
+        "SELECT\r\n",
+        "    date,\r\n",
+        "    machine_id,\r\n",
+        "    health_score_pct,\r\n",
+        "    machine_status,\r\n",
+        "    total_readings,\r\n",
+        "    active_sensors,\r\n",
+        "    ROUND(avg_temperature, 2) AS avg_temperature,\r\n",
+        "    ROUND(avg_pressure, 2)    AS avg_pressure,\r\n",
+        "    ROUND(avg_vibration, 4)   AS avg_vibration\r\n",
+        "FROM iot_pipeline.sensors_dlt.gold_daily_health\r\n",
+        "ORDER BY date, machine_id"
+      ],
+      "catalog": "iot_pipeline",
+      "schema": "sensors_dlt"
+    },
+    {
+      "name": "a0d23059",
+      "displayName": "Machine status counters",
+      "queryLines": [
+        "SELECT\r\n",
+        "    SUM(CASE WHEN machine_status = 'NORMAL'   THEN 1 ELSE 0 END) AS normal_count,\r\n",
+        "    SUM(CASE WHEN machine_status = 'WARNING'  THEN 1 ELSE 0 END) AS warning_count,\r\n",
+        "    SUM(CASE WHEN machine_status = 'CRITICAL' THEN 1 ELSE 0 END) AS critical_count,\r\n",
+        "    COUNT(*)                                                       AS total_machine_days,\r\n",
+        "    ROUND(AVG(health_score_pct), 1)                               AS avg_health_score\r\n",
+        "FROM iot_pipeline.sensors_dlt.gold_daily_health"
+      ],
+      "catalog": "iot_pipeline",
+      "schema": "sensors_dlt"
+    },
+    {
+      "name": "5e626843",
+      "displayName": "Anomalies by machine and sensor",
+      "queryLines": [
+        "SELECT\r\n",
+        "    machine_id,\r\n",
+        "    sensor_type,\r\n",
+        "    COUNT(*)               AS anomaly_count,\r\n",
+        "    ROUND(AVG(z_score), 2) AS avg_z_score,\r\n",
+        "    ROUND(MAX(z_score), 2) AS max_z_score\r\n",
+        "FROM iot_pipeline.sensors_dlt.gold_anomalies\r\n",
+        "GROUP BY machine_id, sensor_type\r\n",
+        "ORDER BY anomaly_count DESC"
+      ],
+      "catalog": "iot_pipeline",
+      "schema": "sensors_dlt"
+    },
+    {
+      "name": "97cc6a0c",
+      "displayName": "Anomaly timeline",
+      "queryLines": [
+        "SELECT\r\n",
+        "    timestamp,\r\n",
+        "    machine_id,\r\n",
+        "    sensor_type,\r\n",
+        "    ROUND(value, 4)        AS value,\r\n",
+        "    ROUND(z_score, 2)      AS z_score,\r\n",
+        "    ROUND(rolling_avg, 4)  AS rolling_avg\r\n",
+        "FROM iot_pipeline.sensors_dlt.gold_anomalies\r\n",
+        "ORDER BY timestamp"
+      ],
+      "catalog": "iot_pipeline",
+      "schema": "sensors_dlt"
+    },
+    {
+      "name": "1d0a86a1",
+      "displayName": "Quality checks detail",
+      "queryLines": [
+        "SELECT\r\n",
+        "    layer,\r\n",
+        "    check_name,\r\n",
+        "    ROUND(metric_value, 2) AS metric_value,\r\n",
+        "    threshold,\r\n",
+        "    status,\r\n",
+        "    checked_at\r\n",
+        "FROM iot_pipeline.sensors.quality_report\r\n",
+        "WHERE run_id = (\r\n",
+        "    SELECT MAX(run_id)\r\n",
+        "    FROM iot_pipeline.sensors.quality_report\r\n",
+        ")\r\n",
+        "ORDER BY layer, check_name"
+      ],
+      "catalog": "iot_pipeline",
+      "schema": "sensors"
+    },
+    {
+      "name": "94983f57",
+      "displayName": "Quality summary counters",
+      "queryLines": [
+        "SELECT\r\n",
+        "    COUNT(*)                                              AS total_checks,\r\n",
+        "    SUM(CASE WHEN status = 'PASS' THEN 1 ELSE 0 END)    AS passed,\r\n",
+        "    SUM(CASE WHEN status = 'WARN' THEN 1 ELSE 0 END)    AS warned,\r\n",
+        "    SUM(CASE WHEN status = 'FAIL' THEN 1 ELSE 0 END)    AS failed,\r\n",
+        "    ROUND(\r\n",
+        "        SUM(CASE WHEN status = 'PASS' THEN 1 ELSE 0 END)\r\n",
+        "        / COUNT(*) * 100\r\n",
+        "    , 0)                                                  AS pass_rate_pct\r\n",
+        "FROM iot_pipeline.sensors.quality_report\r\n",
+        "WHERE run_id = (\r\n",
+        "    SELECT MAX(run_id)\r\n",
+        "    FROM iot_pipeline.sensors.quality_report\r\n",
+        ")"
+      ]
+    },
+    {
+      "name": "9a5ef058",
+      "displayName": "Quality Check event_logs",
+      "queryLines": [
+        "SELECT\r\n",
+        "  date(timestamp) AS date,\r\n",
+        "  regexp_extract(origin.flow_name, '[^.]+$', 0) AS table_name,\r\n",
+        "  sum(details:flow_progress:metrics:num_output_rows) AS output_rows,\r\n",
+        "  sum(details:flow_progress:data_quality:dropped_records::long) AS dropped_records,\r\n",
+        "  ROUND(\r\n",
+        "    sum(details:flow_progress:data_quality:dropped_records::long)\r\n",
+        "      / NULLIF(sum(details:flow_progress:metrics:num_output_rows), 0)\r\n",
+        "      * 100,\r\n",
+        "    2\r\n",
+        "  ) AS drop_rate_pct\r\n",
+        "FROM\r\n",
+        "  iot_pipeline.sensors_dlt.pipeline_sensor_event_logs\r\n",
+        "WHERE\r\n",
+        "  event_type = 'flow_progress'\r\n",
+        "  AND details:flow_progress:status = 'COMPLETED'\r\n",
+        "  AND details:flow_progress:metrics:num_output_rows IS NOT NULL\r\n",
+        "  AND origin.update_id\r\n",
+        "    = (\r\n",
+        "      SELECT\r\n",
+        "        MAX(origin.update_id)\r\n",
+        "      FROM\r\n",
+        "        iot_pipeline.sensors_dlt.pipeline_sensor_event_logs\r\n",
+        "      WHERE\r\n",
+        "        event_type = 'flow_progress'\r\n",
+        "        AND details:flow_progress:status = 'COMPLETED'\r\n",
+        "    )\r\n",
+        "GROUP BY\r\n",
+        "  ALL\r\n",
+        "ORDER BY\r\n",
+        "  date,\r\n",
+        "  table_name"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "2f8b5502",
+      "displayName": "Operations Overview",
+      "layout": [
+        {
+          "widget": {
+            "name": "sensor-readings-over-time",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "c6ef7979",
+                  "fields": [
+                    {
+                      "name": "sensor_type",
+                      "expression": "`sensor_type`"
+                    },
+                    {
+                      "name": "hourly(hour_window)",
+                      "expression": "DATE_TRUNC(\"HOUR\", `hour_window`)"
+                    },
+                    {
+                      "name": "avg(avg_value)",
+                      "expression": "AVG(`avg_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "Sensor readings over time"
+              },
+              "mark": {
+                "size": 0.9
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "hourly(hour_window)",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(avg_value)",
+                  "displayName": "Average Sensor Value",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "sensor_type",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "daily-reading-counts",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "72e4b266",
+                  "fields": [
+                    {
+                      "name": "machine_id",
+                      "expression": "`machine_id`"
+                    },
+                    {
+                      "name": "daily(date)",
+                      "expression": "DATE_TRUNC(\"DAY\", `date`)"
+                    },
+                    {
+                      "name": "sum(total_readings)",
+                      "expression": "SUM(`total_readings`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "Daily reading counts"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "daily(date)",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_readings)",
+                  "displayName": "Total Readings",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "machine_id",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": false
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 8,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "machine-days-monitored",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a0d23059",
+                  "fields": [
+                    {
+                      "name": "sum(total_machine_days)",
+                      "expression": "SUM(`total_machine_days`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Machine-days monitored "
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_machine_days)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 6,
+            "width": 4,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "68633718",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "8a4e8f7e",
+            "queries": [
+              {
+                "name": "dashboards/01f12791546418d4be826533b9fc2f2e/datasets/01f1279305061db0b190bc7a8f7e3386_sensor_type",
+                "query": {
+                  "datasetName": "5e626843",
+                  "fields": [
+                    {
+                      "name": "sensor_type",
+                      "expression": "`sensor_type`"
+                    },
+                    {
+                      "name": "sensor_type_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "sensor_type",
+                    "queryName": "dashboards/01f12791546418d4be826533b9fc2f2e/datasets/01f1279305061db0b190bc7a8f7e3386_sensor_type"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "eb031cec",
+            "queries": [
+              {
+                "name": "dashboards/01f12791546418d4be826533b9fc2f2e/datasets/01f1279305061db0b190bc7a8f7e3386_machine_id",
+                "query": {
+                  "datasetName": "5e626843",
+                  "fields": [
+                    {
+                      "name": "machine_id",
+                      "expression": "`machine_id`"
+                    },
+                    {
+                      "name": "machine_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "machine_id",
+                    "queryName": "dashboards/01f12791546418d4be826533b9fc2f2e/datasets/01f1279305061db0b190bc7a8f7e3386_machine_id"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "071de447",
+            "queries": [
+              {
+                "name": "dashboards/01f12791546418d4be826533b9fc2f2e/datasets/01f127931ec31ffb9def52d85a78f5f6_layer",
+                "query": {
+                  "datasetName": "1d0a86a1",
+                  "fields": [
+                    {
+                      "name": "layer",
+                      "expression": "`layer`"
+                    },
+                    {
+                      "name": "layer_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "layer",
+                    "queryName": "dashboards/01f12791546418d4be826533b9fc2f2e/datasets/01f127931ec31ffb9def52d85a78f5f6_layer"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 1,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "bf1754b0",
+      "displayName": "Machine Health",
+      "layout": [
+        {
+          "widget": {
+            "name": "avg-health-score",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a0d23059",
+                  "fields": [
+                    {
+                      "name": "sum(avg_health_score)",
+                      "expression": "SUM(`avg_health_score`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Avg health score %"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(avg_health_score)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "normal-days",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a0d23059",
+                  "fields": [
+                    {
+                      "name": "sum(normal_count)",
+                      "expression": "SUM(`normal_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Normal days"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(normal_count)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "critical-days",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a0d23059",
+                  "fields": [
+                    {
+                      "name": "sum(critical_count)",
+                      "expression": "SUM(`critical_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Critical days"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(critical_count)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "warning-days",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a0d23059",
+                  "fields": [
+                    {
+                      "name": "sum(warning_count)",
+                      "expression": "SUM(`warning_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Warning days"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(warning_count)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "machine-health-score-by-day",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b59d15e4",
+                  "fields": [
+                    {
+                      "name": "avg(health_score_pct)",
+                      "expression": "AVG(`health_score_pct`)"
+                    },
+                    {
+                      "name": "daily(date)",
+                      "expression": "DATE_TRUNC(\"DAY\", `date`)"
+                    },
+                    {
+                      "name": "machine_id",
+                      "expression": "`machine_id`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "Machine health score by day"
+              },
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "daily(date)",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "machine_id",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "avg(health_score_pct)",
+                  "displayName": "Health score %",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "redyellowgreen"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "daily-health-scores",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b59d15e4",
+                  "fields": [
+                    {
+                      "name": "machine_id",
+                      "expression": "`machine_id`"
+                    },
+                    {
+                      "name": "daily(date)",
+                      "expression": "DATE_TRUNC(\"DAY\", `date`)"
+                    },
+                    {
+                      "name": "avg(health_score_pct)",
+                      "expression": "AVG(`health_score_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Health score trend per machine",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "daily(date)",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(health_score_pct)",
+                  "displayName": "Average Health score %",
+                  "scale": {
+                    "type": "quantitative",
+                    "domain": {
+                      "min": 0,
+                      "max": 105
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "machine_id",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": false
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 9,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "avg-sensor-readings-per-machine",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b59d15e4",
+                  "fields": [
+                    {
+                      "name": "machine_id",
+                      "expression": "`machine_id`"
+                    },
+                    {
+                      "name": "avg(avg_pressure)",
+                      "expression": "AVG(`avg_pressure`)"
+                    },
+                    {
+                      "name": "avg(avg_temperature)",
+                      "expression": "AVG(`avg_temperature`)"
+                    },
+                    {
+                      "name": "avg(avg_vibration)",
+                      "expression": "AVG(`avg_vibration`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "Avg sensor readings per machine"
+              },
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "machine_id",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fields": [
+                    {
+                      "fieldName": "avg(avg_pressure)",
+                      "displayName": "Avg Pressure"
+                    },
+                    {
+                      "fieldName": "avg(avg_temperature)",
+                      "displayName": "Avg Temp"
+                    },
+                    {
+                      "fieldName": "avg(avg_vibration)",
+                      "displayName": "Avg Vibration"
+                    }
+                  ],
+                  "scale": {
+                    "type": "quantitative",
+                    "reverse": false
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "06131559",
+      "displayName": "Anomaly Monitor",
+      "layout": [
+        {
+          "widget": {
+            "name": "total-anomalies-flagged",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "5e626843",
+                  "fields": [
+                    {
+                      "name": "sum(anomaly_count)",
+                      "expression": "SUM(`anomaly_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Total anomalies flagged"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(anomaly_count)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "avg-z-score",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "5e626843",
+                  "fields": [
+                    {
+                      "name": "avg(avg_z_score)",
+                      "expression": "AVG(`avg_z_score`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Avg z-score"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_z_score)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "highest-z-score-detected",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "5e626843",
+                  "fields": [
+                    {
+                      "name": "max(max_z_score)",
+                      "expression": "MAX(`max_z_score`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Highest z-score detected"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(max_z_score)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "anomaly-count-machine-sensor-type",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "5e626843",
+                  "fields": [
+                    {
+                      "name": "sensor_type",
+                      "expression": "`sensor_type`"
+                    },
+                    {
+                      "name": "machine_id",
+                      "expression": "`machine_id`"
+                    },
+                    {
+                      "name": "sum(anomaly_count)",
+                      "expression": "SUM(`anomaly_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": " Anomaly count by machine and sensor type"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "machine_id",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(anomaly_count)",
+                  "displayName": "Anomaly Count",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "sensor_type",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "aebc5f5c",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "97cc6a0c",
+                  "fields": [
+                    {
+                      "name": "sensor_type",
+                      "expression": "`sensor_type`"
+                    },
+                    {
+                      "name": "z_score",
+                      "expression": "`z_score`"
+                    },
+                    {
+                      "name": "hourly(timestamp)",
+                      "expression": "DATE_TRUNC(\"HOUR\", `timestamp`)"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "mark": {
+                "size": -2.5
+              },
+              "widgetType": "scatter",
+              "encodings": {
+                "x": {
+                  "fieldName": "hourly(timestamp)",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "z_score",
+                  "scale": {
+                    "type": "quantitative",
+                    "reverse": false
+                  }
+                },
+                "color": {
+                  "fieldName": "sensor_type",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "size": {
+                  "fieldName": "z_score",
+                  "scale": {
+                    "type": "quantitative",
+                    "domain": {
+                      "min": 0,
+                      "max": 4
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 10,
+            "width": 10,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "anomalous-readings-rolling-baseline",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "97cc6a0c",
+                  "fields": [
+                    {
+                      "name": "daily(timestamp)",
+                      "expression": "DATE_TRUNC(\"DAY\", `timestamp`)"
+                    },
+                    {
+                      "name": "avg(value)",
+                      "expression": "AVG(`value`)"
+                    },
+                    {
+                      "name": "avg(rolling_avg)",
+                      "expression": "AVG(`rolling_avg`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "Anomalous readings vs rolling baseline"
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "daily(timestamp)",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "avg(value)"
+                    },
+                    {
+                      "fieldName": "avg(rolling_avg)"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 4,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "34b49f1e",
+      "displayName": "Pipeline Quality",
+      "layout": [
+        {
+          "widget": {
+            "name": "total-quality-checks",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "94983f57",
+                  "fields": [
+                    {
+                      "name": "sum(total_checks)",
+                      "expression": "SUM(`total_checks`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Total quality checks"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_checks)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "checks-passed",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "94983f57",
+                  "fields": [
+                    {
+                      "name": "sum(passed)",
+                      "expression": "SUM(`passed`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Checks passed"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(passed)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "warnings",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "94983f57",
+                  "fields": [
+                    {
+                      "name": "sum(warned)",
+                      "expression": "SUM(`warned`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Warnings"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(warned)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "pass-rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "94983f57",
+                  "fields": [
+                    {
+                      "name": "sum(pass_rate_pct)",
+                      "expression": "SUM(`pass_rate_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Pass rate %"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(pass_rate_pct)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "quality-checks-by-layer",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "1d0a86a1",
+                  "fields": [
+                    {
+                      "name": "layer",
+                      "expression": "`layer`"
+                    },
+                    {
+                      "name": "check_name",
+                      "expression": "`check_name`"
+                    },
+                    {
+                      "name": "metric_value",
+                      "expression": "`metric_value`"
+                    },
+                    {
+                      "name": "threshold",
+                      "expression": "`threshold`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Quality checks by layer"
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "layer"
+                  },
+                  {
+                    "fieldName": "check_name"
+                  },
+                  {
+                    "fieldName": "metric_value"
+                  },
+                  {
+                    "fieldName": "threshold"
+                  },
+                  {
+                    "fieldName": "status"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 8,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "metric-values-by-check",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "1d0a86a1",
+                  "fields": [
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "sum(metric_value)",
+                      "expression": "SUM(`metric_value`)"
+                    },
+                    {
+                      "name": "check_name",
+                      "expression": "`check_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "Metric values by check"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "sum(metric_value)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "check_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "status",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "row-drop-rate-by-table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "9a5ef058",
+                  "fields": [
+                    {
+                      "name": "table_name",
+                      "expression": "`table_name`"
+                    },
+                    {
+                      "name": "sum(drop_rate_pct)",
+                      "expression": "SUM(`drop_rate_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "Row drop rate % by table"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "table_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "primary": {
+                    "fields": [
+                      {
+                        "fieldName": "sum(drop_rate_pct)",
+                        "displayName": "drop_rate_pct  (SUM)"
+                      }
+                    ],
+                    "scale": {
+                      "type": "quantitative"
+                    }
+                  },
+                  "secondary": {
+                    "fields": [],
+                    "scale": {
+                      "type": "quantitative"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 11,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "0a87d3f9",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Pipeline Quality Summary\r<br>\r<br>This pipeline processes IoT sensor data through a \r<br>3-layer Medallion architecture with automated quality \r<br>checks at every layer.\r<br>\r<br>Bronze: Raw data ingested , nulls and duplicates \r<br>expected and measured.\r<br>\r<br>Silver: Strict validation applied -> 648 rows removed \r<br>(6.6% of Bronze) by DLT expectations. Zero nulls, \r<br>zero duplicates, zero range violations in output.\r<br>\r<br>Gold: Business logic validated -> all 5 machines \r<br>present, health scores within 0-100 range, anomaly \r<br>rate within expected 1-20% band.\r<br>\r<br>Pipeline health: 15/15 checks passed (100%)."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "rows-written-per-table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "9a5ef058",
+                  "fields": [
+                    {
+                      "name": "table_name",
+                      "expression": "`table_name`"
+                    },
+                    {
+                      "name": "sum(output_rows)",
+                      "expression": "SUM(`output_rows`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "Rows written per table"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "table_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(output_rows)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 17,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
